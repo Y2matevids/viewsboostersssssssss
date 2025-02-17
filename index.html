@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Multi-Video Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .video-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        iframe {
+            width: 100%;
+            max-width: 300px;
+            height: 200px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .watch-time {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 20px;
+            }
+            input[type="text"] {
+                font-size: 14px;
+            }
+            button {
+                font-size: 14px;
+                padding: 8px 16px;
+            }
+            iframe {
+                height: 150px;
+            }
+            .watch-time {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>YouTube Multi-Video Player</h1>
+    <div class="controls">
+        <input type="text" id="video-url" placeholder="Enter YouTube video URL">
+        <button onclick="addVideo()">Add Video</button>
+        <button onclick="startPlayback()">Start Playback</button>
+    </div>
+    <div class="video-container" id="video-container"></div>
+    <div class="watch-time" id="watch-time">Total Watch Time: 0 minutes</div>
+
+    <script>
+        // Global variables
+        const videoPlayers = []; // Store YouTube player instances
+        let playbackSequence = 0; // Track playback sequence
+        let totalWatchTime = 0; // Track total watch time in seconds
+
+        // Load YouTube IFrame API
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        // Initialize YouTube players
+        function onYouTubeIframeAPIReady() {
+            const videoUrls = JSON.parse(localStorage.getItem('videoUrls')) || [];
+            videoUrls.forEach((url, index) => {
+                const videoId = extractVideoId(url);
+                if (videoId) {
+                    createPlayer(videoId, index);
+                }
+            });
+        }
+
+        // Extract video ID from URL
+        function extractVideoId(url) {
+            const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        // Create YouTube player
+        function createPlayer(videoId, index) {
+            const player = new YT.Player(`player-${index}`, {
+                height: '200',
+                width: '300',
+                videoId: videoId,
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+            videoPlayers[index] = player;
+        }
+
+        // Add video to the container
+        function addVideo() {
+            const videoUrl = document.getElementById('video-url').value;
+            const videoId = extractVideoId(videoUrl);
+            if (videoId) {
+                const index = videoPlayers.length;
+                const iframe = document.createElement('div');
+                iframe.id = `player-${index}`;
+                document.getElementById('video-container').appendChild(iframe);
+                createPlayer(videoId, index);
+
+                // Save video URL to localStorage
+                const videoUrls = JSON.parse(localStorage.getItem('videoUrls')) || [];
+                videoUrls.push(videoUrl);
+                localStorage.setItem('videoUrls', JSON.stringify(videoUrls));
+            } else {
+                alert('Invalid YouTube URL');
+            }
+        }
+
+        // Start playback sequence
+        function startPlayback() {
+            playbackSequence = 0;
+            totalWatchTime = 0; // Reset total watch time
+            updateWatchTimeDisplay();
+            playNextSequence();
+        }
+
+        // Play videos for the current sequence duration
+        function playNextSequence() {
+            const duration = 30 + (playbackSequence * 30); // 30s, 60s, 90s, etc.
+            videoPlayers.forEach(player => {
+                player.seekTo(0); // Restart video
+                player.playVideo(); // Play video
+                setTimeout(() => player.pauseVideo(), duration * 1000); // Pause after duration
+            });
+
+            // Update total watch time
+            totalWatchTime += duration * videoPlayers.length;
+            updateWatchTimeDisplay();
+
+            playbackSequence = (playbackSequence + 1) % 10; // Reset after 10 sequences
+            setTimeout(playNextSequence, duration * 1000 + 1000); // Start next sequence
+        }
+
+        // Update watch time display
+        function updateWatchTimeDisplay() {
+            const watchTimeElement = document.getElementById('watch-time');
+            const totalMinutes = (totalWatchTime / 60).toFixed(2); // Convert seconds to minutes
+            watchTimeElement.textContent = `Total Watch Time: ${totalMinutes} minutes`;
+        }
+
+        // Player ready event
+        function onPlayerReady(event) {
+            event.target.pauseVideo(); // Pause video initially
+        }
+    </script>
+</body>
+</html>
